@@ -633,15 +633,17 @@ function isColorLight(color) {
     return luminance > 0.7;
 }
 
-async function updateAdjustedTime() {
-    const video = document.querySelector('video');
-    // Change injection point to .ytp-time-display to avoid clipping in .ytp-time-contents
-    let timeDisplay = document.querySelector('.ytp-time-display');
-    if (!timeDisplay) return;
+function getVideoElement() { return document.querySelector('video'); }
+function getTimeDisplayElement() { return document.querySelector('.ytp-time-display'); }
+function getPlayerElement() { return document.querySelector('#movie_player'); }
 
-    // Use synchronous settings from cache
-    const isCollapsed = getCollapsedState();
+function calculateAdjustedTimeLeft(video) {
+    if (!video) return 0;
+    const remaining = video.duration - video.currentTime;
+    return remaining / video.playbackRate;
+}
 
+function injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed) {
     // Remove old expanded adjusted time if present (for collapse logic)
     let adjustedSpan = document.getElementById('yt-adjusted-time');
     if (isCollapsed && adjustedSpan) adjustedSpan.remove();
@@ -685,8 +687,6 @@ async function updateAdjustedTime() {
     // Expanded state: show adjusted time
     adjustedSpan = document.getElementById('yt-adjusted-time');
     let timeTextSpan, settingsBtn;
-    const remaining = video ? video.duration - video.currentTime : 0;
-    const adjusted = video ? remaining / video.playbackRate : 0;
 
     function formatTimeSaved(seconds) {
         seconds = Math.max(0, Math.floor(seconds));
@@ -699,8 +699,8 @@ async function updateAdjustedTime() {
     const showEndTime = getShowEndTime();
     const use24Hour = get24HourTime();
     const opacity = getBoxOpacity();
-    const endTime = formatEndTime(adjusted, use24Hour);
-    const newText = showEndTime ? `${formatTime(adjusted)} | ${endTime}` : `${formatTime(adjusted)}`;
+    const endTime = formatEndTime(adjustedTime, use24Hour);
+    const newText = showEndTime ? `${formatTime(adjustedTime)} | ${endTime}` : `${formatTime(adjustedTime)}`;
     const globalSaved = getGlobalTimeSaved();
     // Tooltip: show session and all-time saved
     const tooltip = `Session saved: ${formatTime(sessionTimeSaved)}\nAll-time saved: ${formatLongDuration(globalSaved)}`;
@@ -722,7 +722,7 @@ async function updateAdjustedTime() {
         adjustedSpan.style.color = textColor;
         adjustedSpan.style.opacity = (opacity / 100).toString();
         adjustedSpan.title = tooltip;
-        adjustedSpan.setAttribute('aria-label', `Adjusted time left: ${formatTime(adjusted)}${showEndTime ? ', ends at ' + endTime : ''}. ${tooltip}`);
+        adjustedSpan.setAttribute('aria-label', `Adjusted time left: ${formatTime(adjustedTime)}${showEndTime ? ', ends at ' + endTime : ''}. ${tooltip}`);
         adjustedSpan.style.fontFamily = ytFont;
         adjustedSpan.style.fontSize = ytFontSize;
         adjustedSpan.style.fontWeight = ytFontWeight;
@@ -793,6 +793,16 @@ async function updateAdjustedTime() {
     }
 }
 
+async function updateAdjustedTime() {
+    const video = getVideoElement();
+    const timeDisplay = getTimeDisplayElement();
+    if (!timeDisplay) return;
+
+    const isCollapsed = getCollapsedState();
+    const adjustedTime = calculateAdjustedTimeLeft(video);
+
+    injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed);
+}
 
 function rgbToHex(rgb) {
     // Accepts 'orange' or 'rgb(r,g,b)' or '#xxxxxx'
@@ -810,7 +820,7 @@ function rgbToHex(rgb) {
 }
 
 async function setup() {
-    const video = document.querySelector('video');
+    const video = getVideoElement();
     if (!video) return;
 
     // Load settings from storage
@@ -829,51 +839,54 @@ async function setup() {
     throttledUpdateAdjustedTime();
 }
 
-let timeDisplayObserver = null;
-function observeTimeDisplay() {
-    const player = document.querySelector('#movie_player');
-    const timeDisplay = document.querySelector('.ytp-time-display');
+function setupObservers() {
+    let timeDisplayObserver = null;
+    function observeTimeDisplay() {
+        const player = getPlayerElement();
+        const timeDisplay = getTimeDisplayElement();
 
-    if (timeDisplayObserver) timeDisplayObserver.disconnect();
+        if (timeDisplayObserver) timeDisplayObserver.disconnect();
 
-    timeDisplayObserver = new MutationObserver(() => {
-        throttledUpdateAdjustedTime();
+        timeDisplayObserver = new MutationObserver(() => {
+            throttledUpdateAdjustedTime();
+        });
+
+        if (timeDisplay) {
+            timeDisplayObserver.observe(timeDisplay, { childList: true, subtree: true, characterData: true });
+        } else if (player) {
+            // Fallback to player if timeDisplay isn't ready yet
+            timeDisplayObserver.observe(player, { childList: true, subtree: true });
+        }
+    }
+
+    // Global observer for player appearing/disappearing
+    const globalObserver = new MutationObserver((mutations) => {
+        const video = getVideoElement();
+        const timeDisplay = getTimeDisplayElement();
+        if (video && timeDisplay) {
+            setup();
+            observeTimeDisplay();
+        }
+    });
+    globalObserver.observe(document.body, { childList: true, subtree: true });
+
+    // YouTube SPA navigation handling
+    window.addEventListener('yt-navigate-finish', () => {
+        setTimeout(() => {
+            setup();
+            observeTimeDisplay();
+        }, 1000);
     });
 
-    if (timeDisplay) {
-        timeDisplayObserver.observe(timeDisplay, { childList: true, subtree: true, characterData: true });
-    } else if (player) {
-        // Fallback to player if timeDisplay isn't ready yet
-        timeDisplayObserver.observe(player, { childList: true, subtree: true });
-    }
+    // Initial run
+    (async () => {
+        await setup();
+        observeTimeDisplay();
+    })();
+
+    window.addEventListener('resize', throttledUpdateAdjustedTime);
 }
-
-// Global observer for player appearing/disappearing
-const globalObserver = new MutationObserver((mutations) => {
-    const video = document.querySelector('video');
-    const timeDisplay = document.querySelector('.ytp-time-display');
-    if (video && timeDisplay) {
-        setup();
-        observeTimeDisplay();
-    }
-});
-globalObserver.observe(document.body, { childList: true, subtree: true });
-
-// YouTube SPA navigation handling
-window.addEventListener('yt-navigate-finish', () => {
-    setTimeout(() => {
-        setup();
-        observeTimeDisplay();
-    }, 1000);
-});
-
-// Initial run
-(async () => {
-    await setup();
-    observeTimeDisplay();
-})();
-
-window.addEventListener('resize', throttledUpdateAdjustedTime);
+setupObservers();
 
 // Listen for color changes in storage and update UI in real time
 if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
@@ -902,7 +915,7 @@ let sessionTimeSaved = 0;
 let globalTimeSavedUpdateInterval = null;
 
 function accumulateTimeSaved() {
-    const video = document.querySelector('video');
+    const video = getVideoElement();
     if (!video) return;
     if (lastVideoTime === null) {
         lastVideoTime = video.currentTime;
@@ -961,7 +974,7 @@ function stopGlobalTimeSavedTracking() {
 
 // Hook into video events
 function setupGlobalTimeSavedHooks() {
-    const video = document.querySelector('video');
+    const video = getVideoElement();
     if (!video) return;
     video.removeEventListener('timeupdate', accumulateTimeSaved);
     video.removeEventListener('ratechange', accumulateTimeSaved);
@@ -977,7 +990,7 @@ function setupGlobalTimeSavedHooks() {
 
 // Call this in setup()
 function setup() {
-    const video = document.querySelector('video');
+    const video = getVideoElement();
     if (!video) return;
     // Prevent duplicate listeners by removing any previous ones
     video.removeEventListener('ratechange', throttledUpdateAdjustedTime);
@@ -1064,7 +1077,7 @@ console.log('[YT Adjusted Time] Script loaded - END');
             videoElement.removeEventListener('play', onVideoPlay);
             videoElement.removeEventListener('pause', onVideoPause);
         }
-        videoElement = document.querySelector('video');
+        videoElement = getVideoElement();
         if (videoElement) {
             videoElement.addEventListener('play', onVideoPlay);
             videoElement.addEventListener('pause', onVideoPause);
