@@ -1,6 +1,12 @@
 console.log('[YT Adjusted Time] Content script loaded');
 
 let lastUpdate = 0;
+function calculateAdjustedTime(duration, currentTime, playbackRate) {
+    if (!duration || !playbackRate || playbackRate <= 0) return 0;
+    const remaining = Math.max(0, duration - currentTime);
+    return remaining / playbackRate;
+}
+
 function throttledUpdateAdjustedTime() {
     const now = Date.now();
     if (now - lastUpdate > 500) {
@@ -685,8 +691,7 @@ async function updateAdjustedTime() {
     // Expanded state: show adjusted time
     adjustedSpan = document.getElementById('yt-adjusted-time');
     let timeTextSpan, settingsBtn;
-    const remaining = video ? video.duration - video.currentTime : 0;
-    const adjusted = video ? remaining / video.playbackRate : 0;
+    const adjusted = video ? calculateAdjustedTime(video.duration, video.currentTime, video.playbackRate) : 0;
 
     function formatTimeSaved(seconds) {
         seconds = Math.max(0, Math.floor(seconds));
@@ -810,6 +815,7 @@ function rgbToHex(rgb) {
 }
 
 async function setup() {
+    if (typeof document === "undefined") return;
     const video = document.querySelector('video');
     if (!video) return;
 
@@ -849,31 +855,41 @@ function observeTimeDisplay() {
 }
 
 // Global observer for player appearing/disappearing
+if (typeof MutationObserver !== 'undefined') {
+    if (typeof MutationObserver !== "undefined") {
 const globalObserver = new MutationObserver((mutations) => {
-    const video = document.querySelector('video');
-    const timeDisplay = document.querySelector('.ytp-time-display');
-    if (video && timeDisplay) {
-        setup();
-        observeTimeDisplay();
+        const video = document.querySelector('video');
+        const timeDisplay = document.querySelector('.ytp-time-display');
+        if (video && timeDisplay) {
+            setup();
+            observeTimeDisplay();
+        }
+    });
+    if (typeof document !== 'undefined') {
+        if (typeof document !== "undefined") { globalObserver.observe(document.body, { childList: true, subtree: true }); }
+}
     }
-});
-globalObserver.observe(document.body, { childList: true, subtree: true });
+}
 
 // YouTube SPA navigation handling
+if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
 window.addEventListener('yt-navigate-finish', () => {
-    setTimeout(() => {
-        setup();
+        setTimeout(() => {
+            setup();
+            observeTimeDisplay();
+        }, 1000);
+    });
+
+    // Initial run
+    (async () => {
+        await setup();
         observeTimeDisplay();
-    }, 1000);
-});
+    })();
 
-// Initial run
-(async () => {
-    await setup();
-    observeTimeDisplay();
-})();
-
-window.addEventListener('resize', throttledUpdateAdjustedTime);
+    window.addEventListener('resize', throttledUpdateAdjustedTime);
+}
+}
 
 // Listen for color changes in storage and update UI in real time
 if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
@@ -975,20 +991,6 @@ function setupGlobalTimeSavedHooks() {
     video.addEventListener('ended', stopGlobalTimeSavedTracking);
 }
 
-// Call this in setup()
-function setup() {
-    const video = document.querySelector('video');
-    if (!video) return;
-    // Prevent duplicate listeners by removing any previous ones
-    video.removeEventListener('ratechange', throttledUpdateAdjustedTime);
-    video.removeEventListener('timeupdate', throttledUpdateAdjustedTime);
-    video.addEventListener('ratechange', throttledUpdateAdjustedTime);
-    video.addEventListener('timeupdate', throttledUpdateAdjustedTime);
-    // Global time saved hooks
-    setupGlobalTimeSavedHooks();
-}
-
-console.log('[YT Adjusted Time] Script loaded - END');
 
 // --- BEGIN: YouTube Watch Session Tracking for Statistics ---
 (function () {
@@ -1060,6 +1062,7 @@ console.log('[YT Adjusted Time] Script loaded - END');
     }
 
     function setupVideoTracking() {
+        if (typeof document === 'undefined') return;
         if (videoElement) {
             videoElement.removeEventListener('play', onVideoPlay);
             videoElement.removeEventListener('pause', onVideoPause);
@@ -1075,7 +1078,9 @@ console.log('[YT Adjusted Time] Script loaded - END');
     }
 
     // Detect navigation (YouTube uses SPA navigation)
+    if (typeof location !== "undefined") {
     let lastUrl = location.href;
+    if (typeof MutationObserver !== "undefined") {
     new MutationObserver(() => {
         if (location.href !== lastUrl) {
             lastUrl = location.href;
@@ -1083,13 +1088,22 @@ console.log('[YT Adjusted Time] Script loaded - END');
             setTimeout(setupVideoTracking, 1000);
         }
     }).observe(document, { subtree: true, childList: true });
+    }
+    }
 
     // Initial setup
-    window.addEventListener('yt-navigate-finish', () => {
-        endSession();
-        setTimeout(setupVideoTracking, 1000);
-    });
+    if (typeof window !== "undefined") {
+        window.addEventListener('yt-navigate-finish', () => {
+            endSession();
+            setTimeout(setupVideoTracking, 1000);
+        });
+        window.addEventListener('beforeunload', endSession);
+    }
     setTimeout(setupVideoTracking, 2000);
-    window.addEventListener('beforeunload', endSession);
 })();
-// --- END: YouTube Watch Session Tracking for Statistics --- 
+// --- END: YouTube Watch Session Tracking for Statistics ---
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        calculateAdjustedTime
+    };
+}

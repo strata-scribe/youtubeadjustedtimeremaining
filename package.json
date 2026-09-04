@@ -1,0 +1,13 @@
+{
+  "name": "youtube-adjusted-time",
+  "version": "1.0.0",
+  "description": "YouTube Adjusted Time Remaining Extension",
+  "main": "content.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.6.2",
+    "jest-environment-jsdom": "^29.6.2"
+  }
+}
