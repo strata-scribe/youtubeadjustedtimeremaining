@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube Adjusted Time Options</title>
+  <style>
+    body { font-family: sans-serif; background: #181818; color: #fff; margin: 0; padding: 2em; }
+    .section { margin-bottom: 2em; }
+    .preview-box {
+      display: inline-block;
+      margin-left: 1em;
+      padding: 0 4px;
+      border-radius: 2px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 400;
+      font-family: 'YouTube Sans', 'Roboto', 'Arial', 'sans-serif';
+      border: 1px solid rgba(0,0,0,0.15);
+      vertical-align: middle;
+      background: #ffa500;
+    }
+    label { margin-right: 1em; }
+    .link { color: #4ea1ff; text-decoration: underline; cursor: pointer; }
+    select, input[type="color"] { margin-left: 0.5em; }
+  </style>
+</head>
+<body>
+  <h1>YouTube Adjusted Time – Options</h1>
+  <div class="section">
+    <label for="theme">Theme:</label>
+    <select id="theme"></select>
+    <br><br>
+    <label for="color">Box Color:</label>
+    <input type="color" id="color" name="color">
+    <label for="color-enabled" style="margin-left:1em;">
+      <input type="checkbox" id="color-enabled" name="color-enabled" checked>
+      Colored background
+    </label>
+    <label for="text-color" style="margin-left:1em;">Text Color:</label>
+    <input type="color" id="text-color" name="text-color">
+    <br><br>
+    <label for="box-opacity">Box Opacity:</label>
+    <input type="range" id="box-opacity" name="box-opacity" min="0" max="100" value="100" style="vertical-align:middle;">
+    <span id="box-opacity-value">100%</span>
+    <label for="show-endtime">Show End Time:</label>
+    <input type="checkbox" id="show-endtime" checked>
+    <label for="24hour" style="margin-left:1em;">24-hour time:</label>
+    <input type="checkbox" id="24hour">
+    <span id="preview" class="preview-box">9:02 | 5:10 PM</span>
+    <button id="apply-btn" style="margin-left: 1em;">Apply</button>
+    <span id="applied-msg" style="margin-left: 1em; color: #4ea1ff; display: none;">Applied!</span>
+  </div>
+  <div class="section" id="stats-section">
+    <h2>YouTube Watch Statistics</h2>
+    <div id="yt-stats-container">
+      <em>Loading statistics...</em>
+    </div>
+    <button id="reset-stats-btn" style="margin-top:1em;">Reset Stats</button>
+  </div>
+  <div class="section">
+    <button id="back-to-youtube" class="link">Back to YouTube</button>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html> 

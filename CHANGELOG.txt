@@ -1,0 +1,41 @@
+YouTube Adjusted Time Remaining - Changelog
+==========================================
+
+Version 1.6 (2024-05-14)
+------------------------
+- Options page now includes all popup settings: theme selector, text color, show/hide end time, 24-hour time toggle, and a live preview matching YouTube's style.
+- Fixed duplicate 'Total time saved' section on the options page.
+- Improved consistency and usability of the options page.
+
+Version 1.5 (2024-05-14)
+------------------------
+- Automatic adaptive contrast for the adjusted time display: text-shadow and border now adjust based on background color luminance for better readability on both light and dark themes.
+- Improved visibility and accessibility for all theme choices.
+
+Version 1.4 (2024-05-14)
+------------------------
+- Added a setting to toggle between 24-hour and 12-hour time formats for the projected end time in the popup and display.
+- The user's preference is saved and respected in the end time display.
+- Minor UI improvements related to the new setting.
+
+Version 1.3 (2024-05-14)
+------------------------
+- Added a settings popup with the following features:
+  - Show total time saved (session and all-time) in the popup and as a tooltip on the adjusted time display.
+  - Allow users to set both background and text color for the adjusted time display.
+  - Option to show/hide the projected end time.
+  - Improved accessibility: all interactive elements are keyboard accessible and have proper ARIA labels; improved contrast.
+  - Added a close (×) button to the popup (in addition to click-outside-to-close).
+- Various UI and UX improvements.
+
+Version 1.7 (2024-05-15)
+------------------------
+- All-time saved is now displayed as years, months, days, hours, and minutes in both the popup and options page for improved readability.
+
+Version 1.8 (2024-05-15)
+------------------------
+- Added a YouTube Watch Statistics dashboard to the options page:
+  - Tracks and displays total watch time (all time, today, this week, this month)
+  - Shows most-watched channels and videos
+  - Displays average session length and peak usage hour
+  - Includes a Reset Stats button 
