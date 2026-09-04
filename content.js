@@ -40,7 +40,9 @@ let settings = {
     use24Hour: false,
     boxOpacity: 100,
     globalSaved: 0,
-    collapsed: false
+    collapsed: false,
+    timeFormat: 'hms',
+    displayPosition: 'default'
 };
 
 async function initSettings() {
@@ -61,6 +63,8 @@ async function initSettings() {
         settings.boxOpacity = parseInt(localStorage.getItem('ytAdjustedTimeBoxOpacity') || '100', 10);
         settings.globalSaved = parseFloat(localStorage.getItem('ytAdjustedTimeGlobalSaved') || '0');
         settings.collapsed = localStorage.getItem('ytAdjustedTimeCollapsed') === 'true';
+        settings.timeFormat = localStorage.getItem('ytAdjustedTimeFormat') || 'hms';
+        settings.displayPosition = localStorage.getItem('ytAdjustedTimePosition') || 'default';
     }
 }
 
@@ -74,6 +78,8 @@ function updateSettingsFromStorage(data) {
     if (data.ytAdjustedTimeBoxOpacity !== undefined) settings.boxOpacity = data.ytAdjustedTimeBoxOpacity;
     if (data.ytAdjustedTimeGlobalSaved !== undefined) settings.globalSaved = data.ytAdjustedTimeGlobalSaved;
     if (data.ytAdjustedTimeCollapsed !== undefined) settings.collapsed = data.ytAdjustedTimeCollapsed;
+    if (data.ytAdjustedTimeFormat !== undefined) settings.timeFormat = data.ytAdjustedTimeFormat;
+    if (data.ytAdjustedTimePosition !== undefined) settings.displayPosition = data.ytAdjustedTimePosition;
 }
 
 // Listen for changes
@@ -646,6 +652,34 @@ async function updateAdjustedTime() {
     let adjustedSpan = document.getElementById('yt-adjusted-time');
     if (isCollapsed && adjustedSpan) adjustedSpan.remove();
 
+    // Apply position function
+    function applyPosition(el) {
+        if (settings.displayPosition === 'top-left' || settings.displayPosition === 'top-right') {
+            const player = document.querySelector('#movie_player');
+            if (player) {
+                el.style.position = 'absolute';
+                el.style.top = '10px';
+                el.style.zIndex = '9999';
+                if (settings.displayPosition === 'top-left') {
+                    el.style.left = '10px';
+                    el.style.right = 'auto';
+                } else {
+                    el.style.right = '10px';
+                    el.style.left = 'auto';
+                }
+                player.appendChild(el);
+            }
+        } else {
+            // default
+            el.style.position = 'static';
+            el.style.top = 'auto';
+            el.style.left = 'auto';
+            el.style.right = 'auto';
+            el.style.zIndex = 'auto';
+            if (timeDisplay) timeDisplay.appendChild(el);
+        }
+    }
+
     // Collapsed state: show clock icon
     if (isCollapsed) {
         let collapsedBtn = document.getElementById('yt-adjusted-time-collapsed');
@@ -677,7 +711,9 @@ async function updateAdjustedTime() {
                     e.preventDefault();
                 }
             };
-            timeDisplay.appendChild(collapsedBtn);
+            applyPosition(collapsedBtn);
+        } else {
+            applyPosition(collapsedBtn);
         }
         return;
     }
@@ -689,9 +725,16 @@ async function updateAdjustedTime() {
     const adjusted = video ? remaining / video.playbackRate : 0;
 
     function formatTimeSaved(seconds) {
+    if (settings.timeFormat === 'decimal') {
+        return (seconds / 3600).toFixed(2) + 'h';
+    }
         seconds = Math.max(0, Math.floor(seconds));
-        const m = Math.floor(seconds / 60);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
         const s = seconds % 60;
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
         return `+${m}:${s.toString().padStart(2, '0')} saved`;
     }
     const boxColor = getBoxColor();
@@ -730,6 +773,7 @@ async function updateAdjustedTime() {
         adjustedSpan.style.padding = ytPadding;
         adjustedSpan.style.border = ytBorder;
         adjustedSpan.style.verticalAlign = ytVerticalAlign;
+        applyPosition(adjustedSpan);
     } else {
         // Remove old adjusted time if present (shouldn't be needed, but for safety)
         const oldSettingsBtn = document.getElementById('yt-adjusted-time-settings-btn');
@@ -789,7 +833,7 @@ async function updateAdjustedTime() {
             e.stopPropagation();
         };
 
-        timeDisplay.appendChild(adjustedSpan);
+        applyPosition(adjustedSpan);
     }
 }
 
