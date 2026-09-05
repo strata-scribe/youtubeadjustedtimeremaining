@@ -54,8 +54,12 @@ const Storage = {
 
 function formatTime(seconds) {
   seconds = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(seconds / 60);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
+  if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 function formatEndTime(secondsFromNow, use24Hour) {
@@ -156,7 +160,8 @@ function updatePreview() {
     'show-endtime': { key: 'ytAdjustedTimeShowEndTime', defaultValue: true },
     '24hour': { key: 'ytAdjustedTime24Hour', defaultValue: false },
     'box-opacity': { key: 'ytAdjustedTimeBoxOpacity', defaultValue: 100 },
-    'display-position': { key: 'ytAdjustedTimePosition', defaultValue: 'video-bar-integrated' }
+    'display-position': { key: 'ytAdjustedTimePosition', defaultValue: 'video-bar-integrated' },
+    'cycle-shortcut': { key: 'ytAdjustedTimeShortcut', defaultValue: 'Shift+T' }
   };
 
   // Load settings dynamically
@@ -242,6 +247,7 @@ document.addEventListener('click', async e => {
     await Storage.set('ytAdjustedTime24Hour', document.getElementById('24hour').checked);
     await Storage.set('ytAdjustedTimeBoxOpacity', document.getElementById('box-opacity').value);
     await Storage.set('ytAdjustedTimePosition', document.getElementById('display-position').value);
+    await Storage.set('ytAdjustedTimeShortcut', document.getElementById('cycle-shortcut').value);
 
     document.getElementById('applied-msg').style.display = 'inline';
     setTimeout(() => {

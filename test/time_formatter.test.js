@@ -59,16 +59,16 @@ function runTests() {
     assert.strictEqual(formatTime(30), '0:30');
     assert.strictEqual(formatTime(60), '1:00');
     assert.strictEqual(formatTime(65), '1:05');
-    assert.strictEqual(formatTime(3600), '60:00');
-    assert.strictEqual(formatTime(3665), '61:05');
+    assert.strictEqual(formatTime(3600), '1:00:00');
+    assert.strictEqual(formatTime(3665), '1:01:05');
 
     // Negative time handling
     assert.strictEqual(formatTime(-10), '0:00');
     assert.strictEqual(formatTime(-3600), '0:00');
 
     // Over 24 hours
-    assert.strictEqual(formatTime(86400), '1440:00');
-    assert.strictEqual(formatTime(90000), '1500:00');
+    assert.strictEqual(formatTime(86400), '24:00:00');
+    assert.strictEqual(formatTime(90000), '25:00:00');
 
     // calculateAdjustedTimeLeft tests
     assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.25 }).totalAdjusted, 400);

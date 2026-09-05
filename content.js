@@ -11,8 +11,12 @@ function throttledUpdateAdjustedTime() {
 
 function formatTime(seconds) {
     seconds = Math.max(0, Math.floor(seconds));
-    const m = Math.floor(seconds / 60);
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
@@ -42,7 +46,8 @@ let settings = {
     globalSaved: 0,
     collapsed: false,
     timeFormat: 'hms',
-    displayPosition: 'video-bar-integrated'
+    displayPosition: 'video-bar-integrated',
+    cycleShortcut: 'Shift+T'
 };
 
 async function initSettings() {
@@ -65,6 +70,7 @@ async function initSettings() {
         settings.collapsed = localStorage.getItem('ytAdjustedTimeCollapsed') === 'true';
         settings.timeFormat = localStorage.getItem('ytAdjustedTimeFormat') || 'hms';
         settings.displayPosition = localStorage.getItem('ytAdjustedTimePosition') || 'video-bar-integrated';
+        settings.cycleShortcut = localStorage.getItem('ytAdjustedTimeShortcut') || 'Shift+T';
     }
 }
 
@@ -80,6 +86,7 @@ function updateSettingsFromStorage(data) {
     if (data.ytAdjustedTimeCollapsed !== undefined) settings.collapsed = data.ytAdjustedTimeCollapsed;
     if (data.ytAdjustedTimeFormat !== undefined) settings.timeFormat = data.ytAdjustedTimeFormat;
     if (data.ytAdjustedTimePosition !== undefined) settings.displayPosition = data.ytAdjustedTimePosition;
+    if (data.ytAdjustedTimeShortcut !== undefined) settings.cycleShortcut = data.ytAdjustedTimeShortcut;
 }
 
 // Listen for changes
@@ -794,7 +801,7 @@ function calculateAdjustedTimeLeft(video) {
     return { totalAdjusted, chapterAdjusted, chapterTitle };
 }
 
-function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
+function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed, percentage) {
     // Remove old expanded adjusted time if present (for collapse logic)
     let adjustedSpan = document.getElementById('yt-adjusted-time');
     if (isCollapsed && adjustedSpan) adjustedSpan.remove();
@@ -898,7 +905,6 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
     const showEndTime = getShowEndTime();
     const use24Hour = get24HourTime();
     const opacity = getBoxOpacity();
-
     // Handle either number (old) or object (new) for adjustedTimeObj
     let totalAdjusted = typeof adjustedTimeObj === 'number' ? adjustedTimeObj : (adjustedTimeObj?.totalAdjusted || 0);
     let chapterAdjusted = typeof adjustedTimeObj === 'object' ? adjustedTimeObj.chapterAdjusted : null;
@@ -906,16 +912,30 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
 
     const endTime = formatEndTime(totalAdjusted, use24Hour);
 
+    const formatValue = (secs) => {
+        if (settings.timeFormat === 'minutes') {
+            return `${Math.ceil(secs / 60)}m`;
+        } else if (settings.timeFormat === 'percentage') {
+            if (percentage !== undefined && percentage !== null) {
+                return `${Math.round(percentage)}%`;
+            }
+            const video = getVideoElement();
+            const pct = (video && video.duration) ? ((video.duration - video.currentTime) / video.duration) * 100 : 0;
+            return `${Math.round(pct)}%`;
+        } else {
+            return formatTime(secs);
+        }
+    };
+
     let newText = '';
     if (chapterAdjusted !== null && chapterTitle) {
-        newText = `Ch: ${formatTime(chapterAdjusted)} | Tot: ${formatTime(totalAdjusted)}`;
+        newText = `Ch: ${formatValue(chapterAdjusted)} | Tot: ${formatValue(totalAdjusted)}`;
         if (showEndTime) {
             newText += ` | ${endTime}`;
         }
     } else {
-        newText = showEndTime ? `${formatTime(totalAdjusted)} | ${endTime}` : `${formatTime(totalAdjusted)}`;
+        newText = showEndTime ? `${formatValue(totalAdjusted)} | ${endTime}` : `${formatValue(totalAdjusted)}`;
     }
-
     const globalSaved = getGlobalTimeSaved();
     // Tooltip: show session and all-time saved
     const tooltip = `Session saved: ${formatTime(sessionTimeSaved)}\nAll-time saved: ${formatLongDuration(globalSaved)}`;
@@ -1016,8 +1036,9 @@ async function updateAdjustedTime() {
 
     const isCollapsed = getCollapsedState();
     const adjustedTimeObj = calculateAdjustedTimeLeft(video);
+    const percentage = video.duration ? ((video.duration - video.currentTime) / video.duration) * 100 : 0;
 
-    injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed);
+    injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed, percentage);
 }
 
 function rgbToHex(rgb) {
@@ -1101,6 +1122,50 @@ function setupObservers() {
     })();
 
     window.addEventListener('resize', throttledUpdateAdjustedTime);
+
+    // Cycle Time Format Keyboard Shortcut
+    window.addEventListener('keydown', (e) => {
+        // Ignore if user is typing in an input, textarea, or contenteditable element
+        if (e.target.closest('input, textarea, [contenteditable]')) return;
+
+        const cycleShortcut = settings.cycleShortcut || 'Shift+T';
+        const parts = cycleShortcut.split('+').map(p => p.trim().toLowerCase());
+        const key = parts.pop();
+
+        const ctrl = parts.includes('ctrl');
+        const shift = parts.includes('shift');
+        const alt = parts.includes('alt');
+        const meta = parts.includes('meta') || parts.includes('cmd');
+
+        if (e.key.toLowerCase() === key &&
+            e.ctrlKey === ctrl &&
+            e.shiftKey === shift &&
+            e.altKey === alt &&
+            e.metaKey === meta) {
+
+            e.preventDefault();
+
+            // Cycle through: hms -> minutes -> percentage -> hms
+            if (settings.timeFormat === 'hms') {
+                settings.timeFormat = 'minutes';
+            } else if (settings.timeFormat === 'minutes') {
+                settings.timeFormat = 'percentage';
+            } else {
+                settings.timeFormat = 'hms';
+            }
+
+            // Save to storage
+            if (typeof browser !== 'undefined' && browser.storage && browser.storage.sync) {
+                browser.storage.sync.set({ ytAdjustedTimeFormat: settings.timeFormat });
+            } else if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                chrome.storage.sync.set({ ytAdjustedTimeFormat: settings.timeFormat });
+            } else {
+                localStorage.setItem('ytAdjustedTimeFormat', settings.timeFormat);
+            }
+
+            updateAdjustedTime();
+        }
+    });
 }
 setupObservers();
 
