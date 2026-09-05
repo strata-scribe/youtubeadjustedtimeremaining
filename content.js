@@ -640,8 +640,18 @@ function isColorLight(color) {
 }
 
 function getVideoElement() { return document.querySelector('video'); }
-function getTimeDisplayElement() { return document.querySelector('.ytp-time-display'); }
-function getPlayerElement() { return document.querySelector('#movie_player'); }
+function getTimeDisplayElement() {
+    return document.querySelector('.ytp-time-display') ||
+           document.querySelector('ytmusic-player-bar .time-info') ||
+           document.querySelector('ytd-shorts-player-controls') ||
+           document.querySelector('ytd-reel-player-overlay-renderer');
+}
+
+function getPlayerElement() {
+    return document.querySelector('#movie_player') ||
+           document.querySelector('ytmusic-player') ||
+           document.querySelector('ytd-shorts');
+}
 
 // --- CHAPTER EXTRACTION ---
 let cachedChapters = null;
@@ -792,7 +802,7 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
     // Apply position function
     function applyPosition(el) {
         if (settings.displayPosition === 'top-left' || settings.displayPosition === 'top-right') {
-            const player = document.querySelector('#movie_player');
+            const player = getPlayerElement();
             if (player) {
                 el.style.position = 'absolute';
                 el.style.top = '10px';

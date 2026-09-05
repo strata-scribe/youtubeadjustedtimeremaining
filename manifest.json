@@ -9,7 +9,10 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.youtube.com/*"
+        "*://www.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://youtube.com/*"
       ],
       "js": [
         "content.js"
