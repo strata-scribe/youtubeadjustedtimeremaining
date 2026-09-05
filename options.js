@@ -79,6 +79,7 @@ function updatePreview() {
   const showEndTime = document.getElementById('show-endtime').checked;
   const use24Hour = document.getElementById('24hour').checked;
   const boxOpacity = document.getElementById('box-opacity').value;
+  const displayPosition = document.getElementById('display-position').value;
   let bg = colorEnabled ? color : 'transparent';
   let fg = textColor;
   if (theme !== 'Custom') {
@@ -101,6 +102,35 @@ function updatePreview() {
   preview.style.textShadow = 'none';
   preview.style.boxShadow = 'none';
   preview.style.opacity = (parseInt(boxOpacity, 10) / 100).toString();
+
+  // Position the preview
+  if (displayPosition === 'top-right') {
+    preview.style.position = 'absolute';
+    preview.style.top = '10px';
+    preview.style.right = '10px';
+    preview.style.left = 'auto';
+    preview.style.bottom = 'auto';
+    document.querySelector('.mock-player').appendChild(preview);
+  } else if (displayPosition === 'bottom-right') {
+    preview.style.position = 'absolute';
+    preview.style.bottom = '40px';
+    preview.style.right = '10px';
+    preview.style.left = 'auto';
+    preview.style.top = 'auto';
+    document.querySelector('.mock-player').appendChild(preview);
+  } else {
+    // video-bar-integrated
+    preview.style.position = 'static';
+    preview.style.top = 'auto';
+    preview.style.left = 'auto';
+    preview.style.right = 'auto';
+    preview.style.bottom = 'auto';
+    const integratedContainer = document.getElementById('preview-integrated-container');
+    if (integratedContainer) {
+      integratedContainer.appendChild(preview);
+    }
+  }
+
   const adjusted = 542; // example seconds
   const endTime = formatEndTime(adjusted, use24Hour);
   preview.textContent = showEndTime ? `${formatTime(adjusted)} | ${endTime}` : `${formatTime(adjusted)}`;
@@ -125,7 +155,8 @@ function updatePreview() {
     'text-color': { key: 'ytAdjustedTimeTextColor', defaultValue: '#ffffff' },
     'show-endtime': { key: 'ytAdjustedTimeShowEndTime', defaultValue: true },
     '24hour': { key: 'ytAdjustedTime24Hour', defaultValue: false },
-    'box-opacity': { key: 'ytAdjustedTimeBoxOpacity', defaultValue: 100 }
+    'box-opacity': { key: 'ytAdjustedTimeBoxOpacity', defaultValue: 100 },
+    'display-position': { key: 'ytAdjustedTimePosition', defaultValue: 'video-bar-integrated' }
   };
 
   // Load settings dynamically
@@ -170,6 +201,10 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', async e => {
+  if (e.target.matches('#display-position')) {
+    updatePreview();
+  }
+
   if (e.target.matches('#theme')) {
     if (e.target.value !== 'Custom') {
       const preset = YT_ADJUSTED_TIME_THEMES.find(t => t.name === e.target.value);
@@ -206,6 +241,7 @@ document.addEventListener('click', async e => {
     await Storage.set('ytAdjustedTimeShowEndTime', document.getElementById('show-endtime').checked);
     await Storage.set('ytAdjustedTime24Hour', document.getElementById('24hour').checked);
     await Storage.set('ytAdjustedTimeBoxOpacity', document.getElementById('box-opacity').value);
+    await Storage.set('ytAdjustedTimePosition', document.getElementById('display-position').value);
 
     document.getElementById('applied-msg').style.display = 'inline';
     setTimeout(() => {

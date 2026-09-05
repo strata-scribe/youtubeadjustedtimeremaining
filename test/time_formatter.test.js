@@ -13,6 +13,7 @@ const context = {
     console: { log: () => {} },
     Math: Math,
     Date: Date,
+    URL: URL,
     browser: { storage: { sync: { get: () => Promise.resolve({}) } } },
     chrome: { storage: { local: { get: () => {} } } },
     document: {
@@ -70,20 +71,20 @@ function runTests() {
     assert.strictEqual(formatTime(90000), '1500:00');
 
     // calculateAdjustedTimeLeft tests
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.25 }), 400);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.5 }), 200);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.75 }), 133.33333333333334);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1 }), 100);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.25 }), 80);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.5 }), 66.66666666666667);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.75 }), 57.142857142857146);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 2 }), 50);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 2.5 }), 40);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 3 }), 33.333333333333336);
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 4 }), 25);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.25 }).totalAdjusted, 400);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.5 }).totalAdjusted, 200);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 0.75 }).totalAdjusted, 133.33333333333334);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1 }).totalAdjusted, 100);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.25 }).totalAdjusted, 80);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.5 }).totalAdjusted, 66.66666666666667);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 1.75 }).totalAdjusted, 57.142857142857146);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 2 }).totalAdjusted, 50);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 2.5 }).totalAdjusted, 40);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 3 }).totalAdjusted, 33.333333333333336);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 0, playbackRate: 4 }).totalAdjusted, 25);
 
-    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 20, playbackRate: 2 }), 40);
-    assert.strictEqual(calculateAdjustedTimeLeft(null), 0);
+    assert.strictEqual(calculateAdjustedTimeLeft({ duration: 100, currentTime: 20, playbackRate: 2 }).totalAdjusted, 40);
+    assert.strictEqual(calculateAdjustedTimeLeft(null).totalAdjusted, 0);
 
     // formatLongDuration tests
     assert.strictEqual(formatLongDuration(0), '0m');

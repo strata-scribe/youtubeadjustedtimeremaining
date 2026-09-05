@@ -42,7 +42,7 @@ let settings = {
     globalSaved: 0,
     collapsed: false,
     timeFormat: 'hms',
-    displayPosition: 'default'
+    displayPosition: 'video-bar-integrated'
 };
 
 async function initSettings() {
@@ -64,7 +64,7 @@ async function initSettings() {
         settings.globalSaved = parseFloat(localStorage.getItem('ytAdjustedTimeGlobalSaved') || '0');
         settings.collapsed = localStorage.getItem('ytAdjustedTimeCollapsed') === 'true';
         settings.timeFormat = localStorage.getItem('ytAdjustedTimeFormat') || 'hms';
-        settings.displayPosition = localStorage.getItem('ytAdjustedTimePosition') || 'default';
+        settings.displayPosition = localStorage.getItem('ytAdjustedTimePosition') || 'video-bar-integrated';
     }
 }
 
@@ -801,27 +801,38 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
 
     // Apply position function
     function applyPosition(el) {
-        if (settings.displayPosition === 'top-left' || settings.displayPosition === 'top-right') {
+        if (settings.displayPosition === 'top-left' || settings.displayPosition === 'top-right' || settings.displayPosition === 'bottom-right') {
             const player = getPlayerElement();
             if (player) {
                 el.style.position = 'absolute';
-                el.style.top = '10px';
                 el.style.zIndex = '9999';
+
                 if (settings.displayPosition === 'top-left') {
+                    el.style.top = '10px';
                     el.style.left = '10px';
                     el.style.right = 'auto';
-                } else {
+                    el.style.bottom = 'auto';
+                } else if (settings.displayPosition === 'top-right') {
+                    el.style.top = '10px';
+                    el.style.right = '10px';
+                    el.style.left = 'auto';
+                    el.style.bottom = 'auto';
+                } else if (settings.displayPosition === 'bottom-right') {
+                    // Position just above the controls
+                    el.style.bottom = '60px';
+                    el.style.top = 'auto';
                     el.style.right = '10px';
                     el.style.left = 'auto';
                 }
                 player.appendChild(el);
             }
         } else {
-            // default
+            // video-bar-integrated / default
             el.style.position = 'static';
             el.style.top = 'auto';
             el.style.left = 'auto';
             el.style.right = 'auto';
+            el.style.bottom = 'auto';
             el.style.zIndex = 'auto';
             if (timeDisplay) timeDisplay.appendChild(el);
         }
