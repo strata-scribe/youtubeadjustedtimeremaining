@@ -643,13 +643,148 @@ function getVideoElement() { return document.querySelector('video'); }
 function getTimeDisplayElement() { return document.querySelector('.ytp-time-display'); }
 function getPlayerElement() { return document.querySelector('#movie_player'); }
 
-function calculateAdjustedTimeLeft(video) {
-    if (!video) return 0;
-    const remaining = video.duration - video.currentTime;
-    return remaining / video.playbackRate;
+// --- CHAPTER EXTRACTION ---
+let cachedChapters = null;
+let cachedVideoId = null;
+
+function getYouTubeChapters() {
+    const url = new URL(window.location.href);
+    const videoId = url.searchParams.get('v');
+
+    if (!videoId) return [];
+
+    if (videoId === cachedVideoId && cachedChapters !== null) {
+        return cachedChapters;
+    }
+
+    let chapters = [];
+
+    // Strategy: Read chapters from the Description/Panel DOM.
+    // Ensure we only extract links that match the current videoId to avoid SPA race conditions.
+    const chapterLinks = document.querySelectorAll('a.yt-core-attributed-string__link[href*="&t="]');
+    if (chapterLinks.length > 0) {
+        for (const link of chapterLinks) {
+            // Verify this link actually belongs to the current video (handles SPA race conditions where old DOM is still present)
+            if (!link.href.includes(videoId) && !link.href.includes(encodeURIComponent(videoId))) {
+                continue;
+            }
+
+            const timeStr = link.textContent.trim();
+            // simple validation for time format (e.g. 1:23, 10:45, 1:23:45)
+            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+                let parts = timeStr.split(':').reverse();
+                let timeStart = 0;
+                for (let i = 0; i < parts.length; i++) {
+                    timeStart += parseInt(parts[i], 10) * Math.pow(60, i);
+                }
+
+                let title = '';
+                // Try to get title from next sibling or parent text
+                let parentText = link.parentElement.textContent.replace(timeStr, '').trim();
+                title = parentText || 'Chapter';
+                chapters.push({ title, timeStart });
+            }
+        }
+    }
+
+    // Fallback: Check script tags (SPA might inject new ones or update ytInitialPlayerResponse)
+    if (chapters.length === 0) {
+        const scriptTags = Array.from(document.querySelectorAll('script'));
+        // Read backwards to get the most recent script tag injected by SPA
+        for (let i = scriptTags.length - 1; i >= 0; i--) {
+            const content = scriptTags[i].textContent;
+            if (content && (content.includes('ytInitialPlayerResponse') || content.includes('ytInitialData'))) {
+                // Verify this script belongs to the current video
+                if (!content.includes(videoId)) continue;
+
+                try {
+                    const regex = /"timeRangeStartMillis":(\d+),[^}]*"title":\{"simpleText":"([^"]+)"\}/g;
+                    let match;
+                    while ((match = regex.exec(content)) !== null) {
+                        const timeStart = parseInt(match[1], 10) / 1000;
+                        const title = match[2];
+                        chapters.push({ title, timeStart });
+                    }
+                    const regex2 = /"timeRangeStartMillis":(\d+),.*?{"text":"([^"]+)"}/g;
+                    let match2;
+                    while ((match2 = regex2.exec(content)) !== null) {
+                        const timeStart = parseInt(match2[1], 10) / 1000;
+                        const title = match2[2];
+                        chapters.push({ title, timeStart });
+                    }
+                } catch(e) {}
+                break; // Found the correct script block
+            }
+        }
+    }
+
+    // Remove duplicates and sort
+    chapters = chapters.filter((c, index, self) =>
+        index === self.findIndex((t) => (
+            t.timeStart === c.timeStart
+        ))
+    ).sort((a, b) => a.timeStart - b.timeStart);
+
+    // To prevent caching an empty array during a loading state in a SPA,
+    // only cache if we found chapters, OR if the video element is fully loaded and actually has no chapters.
+    const video = document.querySelector('video');
+    if (chapters.length > 0) {
+        cachedVideoId = videoId;
+        cachedChapters = chapters;
+    } else if (video && video.readyState >= 3) {
+        // Video is playing/loaded enough, it probably really has no chapters.
+        cachedVideoId = videoId;
+        cachedChapters = [];
+    } else {
+        // DOM might still be loading, do not cache yet.
+        return [];
+    }
+
+    return cachedChapters;
 }
 
-function injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed) {
+function getCurrentChapter(chapters, currentTime) {
+    if (!chapters || chapters.length === 0) return null;
+
+    for (let i = chapters.length - 1; i >= 0; i--) {
+        if (currentTime >= chapters[i].timeStart) {
+            return {
+                current: chapters[i],
+                next: i < chapters.length - 1 ? chapters[i + 1] : null
+            };
+        }
+    }
+
+    return {
+        current: chapters[0], // fallback if somehow before first chapter
+        next: chapters.length > 1 ? chapters[1] : null
+    };
+}
+
+function calculateAdjustedTimeLeft(video) {
+    if (!video) return { totalAdjusted: 0, chapterAdjusted: null, chapterTitle: null };
+
+    const remaining = video.duration - video.currentTime;
+    const totalAdjusted = remaining / video.playbackRate;
+
+    let chapterAdjusted = null;
+    let chapterTitle = null;
+
+    const chapters = getYouTubeChapters();
+    if (chapters && chapters.length > 0) {
+        const currentChapterInfo = getCurrentChapter(chapters, video.currentTime);
+        if (currentChapterInfo && currentChapterInfo.current) {
+            chapterTitle = currentChapterInfo.current.title;
+            const endTime = currentChapterInfo.next ? currentChapterInfo.next.timeStart : video.duration;
+            const chapterRemaining = endTime - video.currentTime;
+            chapterAdjusted = Math.max(0, chapterRemaining / video.playbackRate);
+        }
+    }
+
+    return { totalAdjusted, chapterAdjusted, chapterTitle };
+}
+
+function injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed) {
     // Remove old expanded adjusted time if present (for collapse logic)
     let adjustedSpan = document.getElementById('yt-adjusted-time');
     if (isCollapsed && adjustedSpan) adjustedSpan.remove();
@@ -742,8 +877,24 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed) {
     const showEndTime = getShowEndTime();
     const use24Hour = get24HourTime();
     const opacity = getBoxOpacity();
-    const endTime = formatEndTime(adjustedTime, use24Hour);
-    const newText = showEndTime ? `${formatTime(adjustedTime)} | ${endTime}` : `${formatTime(adjustedTime)}`;
+
+    // Handle either number (old) or object (new) for adjustedTimeObj
+    let totalAdjusted = typeof adjustedTimeObj === 'number' ? adjustedTimeObj : (adjustedTimeObj?.totalAdjusted || 0);
+    let chapterAdjusted = typeof adjustedTimeObj === 'object' ? adjustedTimeObj.chapterAdjusted : null;
+    let chapterTitle = typeof adjustedTimeObj === 'object' ? adjustedTimeObj.chapterTitle : null;
+
+    const endTime = formatEndTime(totalAdjusted, use24Hour);
+
+    let newText = '';
+    if (chapterAdjusted !== null && chapterTitle) {
+        newText = `Ch: ${formatTime(chapterAdjusted)} | Tot: ${formatTime(totalAdjusted)}`;
+        if (showEndTime) {
+            newText += ` | ${endTime}`;
+        }
+    } else {
+        newText = showEndTime ? `${formatTime(totalAdjusted)} | ${endTime}` : `${formatTime(totalAdjusted)}`;
+    }
+
     const globalSaved = getGlobalTimeSaved();
     // Tooltip: show session and all-time saved
     const tooltip = `Session saved: ${formatTime(sessionTimeSaved)}\nAll-time saved: ${formatLongDuration(globalSaved)}`;
@@ -765,7 +916,7 @@ function injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed) {
         adjustedSpan.style.color = textColor;
         adjustedSpan.style.opacity = (opacity / 100).toString();
         adjustedSpan.title = tooltip;
-        adjustedSpan.setAttribute('aria-label', `Adjusted time left: ${formatTime(adjustedTime)}${showEndTime ? ', ends at ' + endTime : ''}. ${tooltip}`);
+        adjustedSpan.setAttribute('aria-label', `Adjusted time left: ${formatTime(totalAdjusted)}${showEndTime ? ', ends at ' + endTime : ''}. ${tooltip}`);
         adjustedSpan.style.fontFamily = ytFont;
         adjustedSpan.style.fontSize = ytFontSize;
         adjustedSpan.style.fontWeight = ytFontWeight;
@@ -843,9 +994,9 @@ async function updateAdjustedTime() {
     if (!timeDisplay) return;
 
     const isCollapsed = getCollapsedState();
-    const adjustedTime = calculateAdjustedTimeLeft(video);
+    const adjustedTimeObj = calculateAdjustedTimeLeft(video);
 
-    injectAdjustedTimeDOM(timeDisplay, adjustedTime, isCollapsed);
+    injectAdjustedTimeDOM(timeDisplay, adjustedTimeObj, isCollapsed);
 }
 
 function rgbToHex(rgb) {
